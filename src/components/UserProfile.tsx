@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Clock, MapPin, Calendar, CreditCard, RotateCw, History, User as UserIcon, Settings, Home, Plus, Trash2, LogOut } from 'lucide-react';
-import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { onAuthStateChanged, User, signOut, updateProfile, GoogleAuthProvider, signInWithPopup, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
+import { auth, db, handleFirestoreError, OperationType, onAuthStateChanged, User, signOut, updateProfile, GoogleAuthProvider, signInWithPopup, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword } from '../lib/firebase';
 import { collection, query, where, orderBy, getDocs, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useToast } from './ToastContext';
 
@@ -71,7 +70,15 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
       toast('success', 'Guest Access', 'Logged in successfully as a guest.');
     } catch (error: any) {
       console.error('Guest Sign-In Error:', error);
-      toast('error', 'Authentication Failed', error.message || 'Could not sign in as a guest.');
+      if (error.code === 'auth/admin-restricted-operation' || error.message?.includes('admin-restricted') || error.message?.includes('restricted-operation')) {
+        toast(
+          'error',
+          'Guest Status: Disabled',
+          'Anonymous authentication is not enabled. Go to Firebase Console -> Build -> Authentication -> Sign-in Method, and enable the "Anonymous" provider.'
+        );
+      } else {
+        toast('error', 'Authentication Failed', error.message || 'Could not sign in as a guest.');
+      }
     } finally {
       setSigningIn('idle');
     }
@@ -97,7 +104,15 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
       }
     } catch (error: any) {
       console.error('Email Authentication Error:', error);
-      toast('error', 'Authentication Failed', error.message || 'Verification failed. Double check your password.');
+      if (error.code === 'auth/operation-not-allowed' || error.message?.includes('operation-not-allowed')) {
+        toast(
+          'error',
+          'Email Login Disabled',
+          'Email/Password sign-in is not enabled. Go to Firebase Console -> Build -> Authentication -> Sign-in Method, and enable the "Email/Password" provider.'
+        );
+      } else {
+        toast('error', 'Authentication Failed', error.message || 'Verification failed. Double check your password.');
+      }
     } finally {
       setSigningIn('idle');
     }
@@ -421,9 +436,9 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
                   className="w-full flex items-center justify-between text-xs text-slate-500 hover:text-navy font-bold py-2 bg-slate-100 hover:bg-slate-200/80 rounded-xl px-4 transition-all"
                 >
                   <span className="flex items-center gap-1.5 text-slate-600">
-                    ⚙️ Deployed domain sign-in guide
+                    ⚙️ Firebase Authentication Guide
                   </span>
-                  <span className="text-[10px]">{showTroubleshoot ? "Hide" : "Show"}</span>
+                  <span className="text-[10px]">{showTroubleshoot ? "Hide Guide" : "Show Guide"}</span>
                 </button>
 
                 <AnimatePresence>
@@ -432,32 +447,52 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       exit={{ opacity: 0, height: 0 }}
-                      className="text-[11px] leading-relaxed text-slate-500 bg-white border border-slate-200 rounded-xl p-4 mt-2 space-y-3 shadow-sm font-sans overflow-hidden"
+                      className="text-[11px] leading-relaxed text-slate-500 bg-white border border-slate-200 rounded-xl p-4 mt-2 space-y-4 shadow-sm font-sans overflow-hidden"
                     >
-                      <p className="font-bold text-navy">Why did Google sign-in fail?</p>
-                      <p>
-                        Firebase authentication blocks popups triggered on newly deployed live domains until they are added as verified origins.
-                      </p>
-                      <p className="font-bold text-navy">Quick fix in 60 seconds:</p>
-                      <ol className="list-decimal pl-4 space-y-1.5 text-slate-600">
-                        <li>
-                          Open your <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-saffron font-bold underline hover:text-saffron-dark">Firebase Console</a>.
-                        </li>
-                        <li>
-                          Go to <strong>Build</strong> &gt; <strong>Authentication</strong> &gt; <strong>Settings</strong>.
-                        </li>
-                        <li>
-                          In <strong>Authorized domains</strong>, click <strong>Add domain</strong>.
-                        </li>
-                        <li>
-                          Add your current domain: <code className="block bg-slate-50 border border-slate-100 p-1 rounded font-mono text-[10px] overflow-x-auto text-pink-600 mt-1">{window.location.hostname}</code>
-                        </li>
-                        <li>
-                          Click save! Google sign-ins will immediately authenticate successfully.
-                        </li>
-                      </ol>
-                      <div className="bg-saffron/10 border-l-2 border-saffron p-2 rounded text-[10px]">
-                        <span className="font-bold text-saffron-dark">Pro Tip:</span> <strong>Continue as Guest</strong> and <strong>Email Login</strong> bypass this domain verification completely and work instantly on all viewports!
+                      <div>
+                        <p className="font-bold text-navy flex items-center gap-1">🌐 1. Google Auth (Authorized Domains)</p>
+                        <p className="mt-1">
+                          Firebase authentication blocks Google sign-in popups triggered on newly deployed live domains until they are whitelisted.
+                        </p>
+                        <p className="font-semibold text-slate-700 mt-2">To fix:</p>
+                        <ol className="list-decimal pl-4 mt-1 space-y-1 text-slate-600">
+                          <li>
+                            Open your <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-saffron font-bold underline hover:text-saffron-dark">Firebase Console</a>.
+                          </li>
+                          <li>
+                            Go to <strong>Build</strong> &gt; <strong>Authentication</strong> &gt; <strong>Settings</strong> tab.
+                          </li>
+                          <li>
+                            Under <strong>Authorized domains</strong>, click <strong>Add domain</strong> and add:
+                            <code className="block bg-slate-50 border border-slate-100 p-1 rounded font-mono text-[10px] text-pink-600 mt-1 overflow-x-auto">{window.location.hostname}</code>
+                          </li>
+                        </ol>
+                      </div>
+
+                      <div className="border-t border-slate-100 pt-3">
+                        <p className="font-bold text-navy flex items-center gap-1">✉️ 2. Enable Email & Password Sign-In</p>
+                        <p className="mt-1">
+                          If Email Login shows <code className="text-pink-600 bg-slate-50 px-1 rounded">auth/operation-not-allowed</code>, enable the provider:
+                        </p>
+                        <ol className="list-decimal pl-4 mt-1 space-y-1 text-slate-600">
+                          <li>In your Firebase Console, click on your project.</li>
+                          <li>Go to <strong>Build</strong> &gt; <strong>Authentication</strong> &gt; <strong>Sign-in method</strong> tab.</li>
+                          <li>Click <strong>Add new provider</strong> (or edit existing) and choose <strong>Email/Password</strong>.</li>
+                          <li>Enable <strong>Email/Password</strong> and click <strong>Save</strong>.</li>
+                        </ol>
+                      </div>
+
+                      <div className="border-t border-slate-100 pt-3">
+                        <p className="font-bold text-navy flex items-center gap-1">👥 3. Enable Guest (Anonymous) Login</p>
+                        <p className="mt-1">
+                          If Guest sign-in shows <code className="text-pink-600 bg-slate-50 px-1 rounded">auth/admin-restricted-operation</code>, enable anonymous access:
+                        </p>
+                        <ol className="list-decimal pl-4 mt-1 space-y-1 text-slate-600">
+                          <li>In your Firebase Console, click on your project.</li>
+                          <li>Go to <strong>Build</strong> &gt; <strong>Authentication</strong> &gt; <strong>Sign-in method</strong> tab.</li>
+                          <li>Click <strong>Add new provider</strong> under additional providers and choose <strong>Anonymous</strong>.</li>
+                          <li>Toggle is to enabled and click <strong>Save</strong>.</li>
+                        </ol>
                       </div>
                     </motion.div>
                   )}

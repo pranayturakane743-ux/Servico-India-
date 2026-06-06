@@ -7,8 +7,8 @@ import { Invoice } from './Invoice';
 import confetti from 'canvas-confetti';
 import QRCode from 'react-qr-code';
 import { useToast } from './ToastContext';
-import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { signInAnonymously, onAuthStateChanged, User, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
+import { auth, db, handleFirestoreError, OperationType, signInAnonymously, onAuthStateChanged, User } from '../lib/firebase';
+import { RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 
 interface WizardProps {

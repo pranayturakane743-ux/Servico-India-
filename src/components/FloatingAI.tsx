@@ -2,9 +2,8 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Send, Loader2, Sparkles, MessageSquare } from 'lucide-react';
 import { useLocale } from '../LocaleContext';
-import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType, onAuthStateChanged } from '../lib/firebase';
 import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
 
 interface Message {
   role: 'user' | 'model';
