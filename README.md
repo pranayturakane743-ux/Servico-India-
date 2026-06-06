@@ -132,3 +132,5 @@ Make sure you have [Node.js](https://nodejs.org/) (version 18+ recommended) inst
 ## 🔒 Security & Performance
 * **Lazy SDK Initializations**: All heavy third-party assets and client libraries are initialized dynamically, preventing server startup crashes.
 * **Unified Build Strategy**: Eliminates relative ESM import paths by using Esbuild-bundled standard CommonJS targets for near-instantaneous cloud cold starts.
+
+To run :- https://ai.studio/apps/cbe9ee05-7bf2-41bf-a58a-bc832ee7016c?fullscreenApplet=true
