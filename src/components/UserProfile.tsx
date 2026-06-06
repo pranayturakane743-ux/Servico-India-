@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Clock, MapPin, Calendar, CreditCard, RotateCw, History, User as UserIcon, Settings, Home, Plus, Trash2, LogOut } from 'lucide-react';
 import { auth, db } from '../lib/firebase';
-import { onAuthStateChanged, User, signOut, updateProfile, GoogleAuthProvider, signInWithPopup, signInAnonymously } from 'firebase/auth';
+import { onAuthStateChanged, User, signOut, updateProfile, GoogleAuthProvider, signInWithPopup, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, orderBy, getDocs, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useToast } from './ToastContext';
 
@@ -43,7 +43,12 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
   const { toast } = useToast();
   const [user, setUser] = useState<User | null>(auth.currentUser);
   const [activeTab, setActiveTab] = useState<TabType>('bookings');
-  const [signingIn, setSigningIn] = useState<'idle' | 'google' | 'guest'>('idle');
+  const [signingIn, setSigningIn] = useState<'idle' | 'google' | 'guest' | 'email'>('idle');
+  const [showEmailAuth, setShowEmailAuth] = useState(false);
+  const [emailValue, setEmailValue] = useState('');
+  const [passwordValue, setPasswordValue] = useState('');
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
   const handleGoogleSignIn = async () => {
     setSigningIn('google');
@@ -53,7 +58,7 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
       toast('success', 'Logged In', 'Successfully signed in with Google.');
     } catch (error: any) {
       console.error('Google Sign-In Error:', error);
-      toast('error', 'Sign-In Failed', error.message || 'Could not sign in with Google.');
+      toast('error', 'Sign-In Failed', error.message || 'Could not sign in with Google. Check popup blockers or view deployment instructions at the bottom.');
     } finally {
       setSigningIn('idle');
     }
@@ -67,6 +72,32 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
     } catch (error: any) {
       console.error('Guest Sign-In Error:', error);
       toast('error', 'Authentication Failed', error.message || 'Could not sign in as a guest.');
+    } finally {
+      setSigningIn('idle');
+    }
+  };
+
+  const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!emailValue.trim() || !passwordValue.trim()) {
+      toast('error', 'Missing Data', 'Please provide both email and password.');
+      return;
+    }
+    setSigningIn('email');
+    try {
+      if (isSignUp) {
+        const cred = await createUserWithEmailAndPassword(auth, emailValue.trim(), passwordValue.trim());
+        if (cred.user) {
+          await updateProfile(cred.user, { displayName: emailValue.split('@')[0] });
+        }
+        toast('success', 'Register Success', 'Account created successfully.');
+      } else {
+        await signInWithEmailAndPassword(auth, emailValue.trim(), passwordValue.trim());
+        toast('success', 'Sign In Success', 'Logged in successfully.');
+      }
+    } catch (error: any) {
+      console.error('Email Authentication Error:', error);
+      toast('error', 'Authentication Failed', error.message || 'Verification failed. Double check your password.');
     } finally {
       setSigningIn('idle');
     }
@@ -233,7 +264,7 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
           animate={{ x: 0 }}
           exit={{ x: '100%' }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="w-full max-w-md h-full bg-slate-50 flex flex-col shadow-2xl relative"
+          className="w-full max-w-md h-full bg-slate-50 flex flex-col shadow-2xl relative overflow-y-auto"
         >
           <button 
             onClick={onClose} 
@@ -242,7 +273,7 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
             <X className="w-5 h-5" />
           </button>
           
-          <div className="flex-1 flex flex-col justify-center px-8 py-12 relative overflow-hidden">
+          <div className="px-8 py-12 relative">
             {/* Background ambient accents */}
             <div className="absolute top-0 right-0 w-48 h-48 bg-saffron/10 rounded-full blur-3xl -mr-16 -mt-16" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-navy/5 rounded-full blur-3xl -ml-16 -mb-16" />
@@ -260,12 +291,12 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
                 </p>
               </div>
 
-              <div className="space-y-3 pt-4">
+              <div className="space-y-3 pt-4 text-left">
                 {/* Google Sign In Button */}
                 <button
                   onClick={handleGoogleSignIn}
                   disabled={signingIn !== 'idle'}
-                  className="w-full flex items-center justify-center bg-white hover:bg-slate-50 text-slate-700 font-bold py-3.5 px-5 rounded-2xl border border-slate-200 hover:border-slate-300 hover:shadow-sm transform active:scale-95 transition-all text-sm group focus:outline-none focus:ring-2 focus:ring-navy/20 cursor-pointer"
+                  className="w-full flex items-center justify-center bg-white hover:bg-slate-50 text-slate-700 font-bold py-3.5 px-5 rounded-2xl border border-slate-200 hover:border-slate-300 hover:shadow-sm transform active:scale-95 transition-all text-sm group focus:outline-none focus:ring-2 focus:ring-navy/20 cursor-pointer animate-fade-in"
                 >
                   {signingIn === 'google' ? (
                     <div className="w-5 h-5 border-2 border-slate-400 border-t-slate-800 rounded-full animate-spin" />
@@ -303,13 +334,133 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
                   {signingIn === 'guest' ? (
                     <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
-                    'Continue as Guest'
+                    'Continue as Guest (Instant Approval)'
                   )}
                 </button>
+
+                {/* Toggle Email Authentication Form */}
+                <div className="pt-2 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowEmailAuth(!showEmailAuth)}
+                    className="text-xs text-navy font-bold hover:underline py-1 inline-flex items-center gap-1"
+                  >
+                    {showEmailAuth ? "Hide Email/Password login" : "Or sign in / sign up with Email"}
+                  </button>
+                </div>
+
+                <AnimatePresence>
+                  {showEmailAuth && (
+                    <motion.form
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      onSubmit={handleEmailAuth}
+                      className="bg-white border border-slate-200 p-4 rounded-2xl space-y-3 shadow-sm mt-1 overflow-hidden"
+                    >
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Email</label>
+                        <input
+                          type="email"
+                          required
+                          value={emailValue}
+                          onChange={(e) => setEmailValue(e.target.value)}
+                          placeholder="yourname@gmail.com"
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-saffron/35 focus:border-saffron outline-none transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-bold text-slate-500 uppercase tracking-wide mb-1">Password</label>
+                        <input
+                          type="password"
+                          required
+                          value={passwordValue}
+                          onChange={(e) => setPasswordValue(e.target.value)}
+                          placeholder="••••••••"
+                          className="w-full border border-slate-200 rounded-xl px-3 py-2 text-xs focus:ring-2 focus:ring-saffron/35 focus:border-saffron outline-none transition-all"
+                        />
+                      </div>
+                      
+                      <button
+                        type="submit"
+                        disabled={signingIn !== 'idle'}
+                        className="w-full py-2.5 bg-saffron hover:bg-saffron-dark text-navy font-bold rounded-xl text-xs transition-colors shadow-sm focus:outline-none"
+                      >
+                        {signingIn === 'email' ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <span className="w-3.5 h-3.5 border-2 border-navy/30 border-t-navy rounded-full animate-spin" /> 
+                            Verifying...
+                          </span>
+                        ) : isSignUp ? "Create Account & Sign In" : "Sign In with Email"}
+                      </button>
+
+                      <div className="text-center pt-1">
+                        <button
+                          type="button"
+                          className="text-[10px] text-slate-400 hover:text-navy hover:underline transition-colors font-semibold"
+                          onClick={() => setIsSignUp(!isSignUp)}
+                        >
+                          {isSignUp ? "Already have an account? Sign In" : "Need an account? Sign Up now"}
+                        </button>
+                      </div>
+                    </motion.form>
+                  )}
+                </AnimatePresence>
               </div>
 
-              <div className="pt-2 text-xs text-slate-400 font-medium font-sans">
-                By signing in, you agree to Servico's Terms & Privacy standards.
+              {/* Troubleshooting Instructions Card */}
+              <div className="pt-3 border-t border-slate-100 text-left">
+                <button
+                  type="button"
+                  onClick={() => setShowTroubleshoot(!showTroubleshoot)}
+                  className="w-full flex items-center justify-between text-xs text-slate-500 hover:text-navy font-bold py-2 bg-slate-100 hover:bg-slate-200/80 rounded-xl px-4 transition-all"
+                >
+                  <span className="flex items-center gap-1.5 text-slate-600">
+                    ⚙️ Deployed domain sign-in guide
+                  </span>
+                  <span className="text-[10px]">{showTroubleshoot ? "Hide" : "Show"}</span>
+                </button>
+
+                <AnimatePresence>
+                  {showTroubleshoot && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="text-[11px] leading-relaxed text-slate-500 bg-white border border-slate-200 rounded-xl p-4 mt-2 space-y-3 shadow-sm font-sans overflow-hidden"
+                    >
+                      <p className="font-bold text-navy">Why did Google sign-in fail?</p>
+                      <p>
+                        Firebase authentication blocks popups triggered on newly deployed live domains until they are added as verified origins.
+                      </p>
+                      <p className="font-bold text-navy">Quick fix in 60 seconds:</p>
+                      <ol className="list-decimal pl-4 space-y-1.5 text-slate-600">
+                        <li>
+                          Open your <a href="https://console.firebase.google.com/" target="_blank" rel="noopener noreferrer" className="text-saffron font-bold underline hover:text-saffron-dark">Firebase Console</a>.
+                        </li>
+                        <li>
+                          Go to <strong>Build</strong> &gt; <strong>Authentication</strong> &gt; <strong>Settings</strong>.
+                        </li>
+                        <li>
+                          In <strong>Authorized domains</strong>, click <strong>Add domain</strong>.
+                        </li>
+                        <li>
+                          Add your current domain: <code className="block bg-slate-50 border border-slate-100 p-1 rounded font-mono text-[10px] overflow-x-auto text-pink-600 mt-1">{window.location.hostname}</code>
+                        </li>
+                        <li>
+                          Click save! Google sign-ins will immediately authenticate successfully.
+                        </li>
+                      </ol>
+                      <div className="bg-saffron/10 border-l-2 border-saffron p-2 rounded text-[10px]">
+                        <span className="font-bold text-saffron-dark">Pro Tip:</span> <strong>Continue as Guest</strong> and <strong>Email Login</strong> bypass this domain verification completely and work instantly on all viewports!
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <div className="pt-2 text-[11px] text-slate-400 font-medium font-sans">
+                By signing in, you agree to Servico's terms & local conditions.
               </div>
             </div>
           </div>
