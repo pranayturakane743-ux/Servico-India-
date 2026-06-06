@@ -7,7 +7,7 @@ import { Invoice } from './Invoice';
 import confetti from 'canvas-confetti';
 import QRCode from 'react-qr-code';
 import { useToast } from './ToastContext';
-import { auth, db } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { signInAnonymously, onAuthStateChanged, User, RecaptchaVerifier, signInWithPhoneNumber, ConfirmationResult } from 'firebase/auth';
 import { collection, addDoc, serverTimestamp, doc, updateDoc } from 'firebase/firestore';
 
@@ -151,21 +151,25 @@ export const BookingWizard = ({ service, onClose }: WizardProps) => {
       
       const currentUser = auth.currentUser;
       if (currentUser) {
-        const docRef = await addDoc(collection(db, 'bookings'), {
-          serviceId: details.serviceId,
-          serviceName: details.serviceName,
-          userId: currentUser.uid,
-          status: 'assigned',
-          amount: details.amount,
-          hours: details.hours || 1,
-          address: details.address,
-          phone: details.phone,
-          date: details.date,
-          time: details.time,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        });
-        setDetails(prev => ({ ...prev, bookingId: docRef.id }));
+        try {
+          const docRef = await addDoc(collection(db, 'bookings'), {
+            serviceId: details.serviceId,
+            serviceName: details.serviceName,
+            userId: currentUser.uid,
+            status: 'assigned',
+            amount: details.amount,
+            hours: details.hours || 1,
+            address: details.address,
+            phone: details.phone,
+            date: details.date,
+            time: details.time,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+          setDetails(prev => ({ ...prev, bookingId: docRef.id }));
+        } catch (dbErr) {
+          handleFirestoreError(dbErr, OperationType.CREATE, 'bookings');
+        }
       }
       
       nextStep('TRACKING');
@@ -239,8 +243,15 @@ export const BookingWizard = ({ service, onClose }: WizardProps) => {
            });
            toast('success', 'Simulated Payment', `${method} payment simulated.`);
            setIsPaid(true);
+           console.error('Firestore Error: ', JSON.stringify({
+             error: error.message,
+             authInfo: { userId: auth.currentUser?.uid },
+             operationType: OperationType.WRITE,
+             path: 'bookings'
+           }));
         } else {
            toast('error', 'Failed to book', 'Something went wrong, please try again.');
+           handleFirestoreError(error, OperationType.WRITE, 'bookings');
         }
       } finally {
         setLoadingAction(false);

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Clock, MapPin, Calendar, CreditCard, RotateCw, History, User as UserIcon, Settings, Home, Plus, Trash2, LogOut } from 'lucide-react';
-import { auth, db } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { onAuthStateChanged, User, signOut, updateProfile, GoogleAuthProvider, signInWithPopup, signInAnonymously, signInWithEmailAndPassword, createUserWithEmailAndPassword } from 'firebase/auth';
 import { collection, query, where, orderBy, getDocs, doc, getDoc, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { useToast } from './ToastContext';
@@ -159,6 +159,7 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
         setBookings(data);
       } catch (error) {
         console.error('Failed to fetch bookings:', error);
+        handleFirestoreError(error, OperationType.GET, 'bookings');
       } finally {
         setLoadingBookings(false);
       }
@@ -177,6 +178,7 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
         }
       } catch (error) {
         console.error('Failed to fetch profile:', error);
+        handleFirestoreError(error, OperationType.GET, `users/${user.uid}`);
       } finally {
         setLoadingProfile(false);
       }
@@ -203,6 +205,7 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
       setShowAddAddress(false);
     } catch (error) {
       console.error('Failed to add address:', error);
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
     } finally {
       setSaving(false);
     }
@@ -221,6 +224,7 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
       }));
     } catch (error) {
       console.error('Failed to delete address:', error);
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
     }
   };
 
@@ -242,6 +246,7 @@ export function UserProfile({ onClose, onRebook }: UserProfileProps) {
     } catch (error) {
       console.error('Failed to update settings:', error);
       alert('Failed to update settings.');
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
     } finally {
       setSaving(false);
     }

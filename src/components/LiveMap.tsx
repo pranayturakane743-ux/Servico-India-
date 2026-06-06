@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { MapPin, Navigation, Phone, ShieldCheck, MessageCircle, X, Send } from 'lucide-react';
 import { useToast } from './ToastContext';
-import { auth, db } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot, addDoc, serverTimestamp } from 'firebase/firestore';
 import { SafeVideo } from './SafeVideo';
 
@@ -73,7 +73,7 @@ export const LiveMap = ({ onAdvance, technician, bookingId }: { onAdvance: () =>
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
       }, 100);
     }, (error) => {
-      console.error("Firestore Listen Error:", error);
+      handleFirestoreError(error, OperationType.LIST, `bookings/${bookingId}/messages`);
     });
 
     return () => unsubscribe();
@@ -93,6 +93,7 @@ export const LiveMap = ({ onAdvance, technician, bookingId }: { onAdvance: () =>
     } catch (error) {
       console.error("Failed to send message:", error);
       toast('error', 'Error', 'Failed to send message');
+      handleFirestoreError(error, OperationType.CREATE, `bookings/${bookingId}/messages`);
     }
   };
 

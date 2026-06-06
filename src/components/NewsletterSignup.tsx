@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, CheckCircle, ArrowRight } from 'lucide-react';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -23,6 +23,7 @@ export const NewsletterSignup = () => {
     } catch (err) {
       console.error(err);
       setStatus('error');
+      handleFirestoreError(err, OperationType.CREATE, 'newsletters');
     }
   };
 

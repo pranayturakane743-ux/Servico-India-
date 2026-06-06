@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Send, Loader2, Sparkles, MessageSquare } from 'lucide-react';
 import { useLocale } from '../LocaleContext';
-import { auth, db } from '../lib/firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -78,7 +78,7 @@ export const FloatingAI = () => {
         setMessages([{ role: 'model', text: initialMessages[locale] || initialMessages.en }]);
       }
     }, (error) => {
-      console.error("Error reading aura messages directly from database:", error);
+      handleFirestoreError(error, OperationType.LIST, 'aura_messages');
     });
 
     return () => unsubscribe();
@@ -119,6 +119,7 @@ export const FloatingAI = () => {
     } catch (error) {
       console.error("Direct-to-DB message save error:", error);
       setMessages(prev => [...prev, { role: 'model', text: "Could not send message. Please review your network or try again." }]);
+      handleFirestoreError(error, OperationType.CREATE, 'aura_messages');
     } finally {
       setIsLoading(false);
     }
