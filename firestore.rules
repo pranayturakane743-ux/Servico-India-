@@ -1,0 +1,102 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function isValidBooking(data) {
+      return data.keys().hasAll(['serviceId', 'serviceName', 'userId', 'status', 'amount', 'address', 'phone'])
+          && data.serviceId is string && data.serviceId.size() > 0 && data.serviceId.size() <= 100
+          && data.serviceName is string && data.serviceName.size() > 0 && data.serviceName.size() <= 200
+          && data.userId == request.auth.uid
+          && data.status is string && data.status.size() > 0 && data.status.size() <= 50
+          && (data.amount is int || data.amount is float)
+          && (!data.keys().hasAny(['hours']) || (data.hours is int || data.hours is float))
+          && (!data.keys().hasAny(['date']) || (data.date is string && data.date.size() > 0 && data.date.size() <= 50))
+          && (!data.keys().hasAny(['time']) || (data.time is string && data.time.size() > 0 && data.time.size() <= 50))
+          && data.address is string && data.address.size() > 0 && data.address.size() <= 500
+          && data.phone is string && data.phone.size() > 0 && data.phone.size() <= 20;
+    }
+
+    function isValidUserProfile(data) {
+      return (!data.keys().hasAny(['phone']) || (data.phone is string && data.phone.size() <= 20))
+          && (!data.keys().hasAny(['emailNotifications']) || data.emailNotifications is bool)
+          && (!data.keys().hasAny(['smsNotifications']) || data.smsNotifications is bool)
+          && (!data.keys().hasAny(['addresses']) || (data.addresses is list && data.addresses.size() <= 20));
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['text', 'senderId', 'createdAt'])
+          && data.keys().size() == 3
+          && data.text is string && data.text.size() > 0 && data.text.size() <= 1000
+          && data.senderId == request.auth.uid
+          && data.createdAt == request.time;
+    }
+
+    function isValidNewsletterSubscriber(data) {
+      return data.keys().hasAll(['email', 'createdAt'])
+          && data.keys().size() == 2
+          && data.email is string && data.email.size() > 0 && data.email.matches('^.+@.+\\..+$')
+          && data.createdAt == request.time;
+    }
+
+    match /bookings/{bookingId} {
+      allow read: if isSignedIn() && existing().userId == request.auth.uid;
+      allow create: if isSignedIn() 
+                    && isValidId(bookingId) 
+                    && isValidBooking(incoming()) 
+                    && incoming().keys().size() <= 12
+                    && incoming().createdAt == request.time
+                    && incoming().updatedAt == request.time;
+      
+      allow update: if isSignedIn()
+                    && existing().userId == request.auth.uid
+                    && isValidBooking(incoming())
+                    && incoming().userId == existing().userId
+                    && incoming().createdAt == existing().createdAt
+                    && incoming().updatedAt == request.time
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt']);
+                    
+      match /messages/{messageId} {
+        allow read: if isSignedIn() 
+                    && get(/databases/$(database)/documents/bookings/$(bookingId)).data.userId == request.auth.uid;
+        allow create: if isSignedIn()
+                      && isValidId(messageId)
+                      && isValidMessage(incoming())
+                      && get(/databases/$(database)/documents/bookings/$(bookingId)).data.userId == request.auth.uid;
+      }
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && userId == request.auth.uid;
+      allow create: if isSignedIn() 
+                    && userId == request.auth.uid 
+                    && isValidUserProfile(incoming());
+      allow update: if isSignedIn()
+                    && userId == request.auth.uid
+                    && isValidUserProfile(incoming())
+                    && incoming().diff(existing()).affectedKeys().hasOnly(['phone', 'emailNotifications', 'smsNotifications', 'addresses']);
+    }
+
+    match /newsletters/{docId} {
+      allow create: if isValidNewsletterSubscriber(incoming());
+    }
+  }
+}

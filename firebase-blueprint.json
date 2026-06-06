@@ -1,0 +1,74 @@
+{
+  "entities": {
+    "Booking": {
+      "title": "Booking",
+      "description": "A service booking document",
+      "type": "object",
+      "properties": {
+        "serviceId": { "type": "string" },
+        "serviceName": { "type": "string" },
+        "userId": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "assigned", "completed", "cancelled", "on_the_way"] },
+        "amount": { "type": "number" },
+        "hours": { "type": "number" },
+        "date": { "type": "string" },
+        "time": { "type": "string" },
+        "address": { "type": "string" },
+        "phone": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["serviceId", "serviceName", "userId", "status", "amount", "address", "phone", "date", "time", "hours"]
+    },
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "User profile with settings and addresses",
+      "type": "object",
+      "properties": {
+        "addresses": { "type": "array" },
+        "phone": { "type": "string" },
+        "emailNotifications": { "type": "boolean" },
+        "smsNotifications": { "type": "boolean" }
+      }
+    },
+    "Message": {
+      "title": "Chat Message",
+      "description": "A message sent in the chat",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "senderId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["text", "senderId", "createdAt"]
+    },
+    "NewsletterSubscriber": {
+      "title": "Newsletter Subscriber",
+      "description": "User subscribed to newsletter",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["email", "createdAt"]
+    }
+  },
+  "firestore": {
+    "bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "Bookings for services"
+    },
+    "bookings/{bookingId}/messages/{messageId}": {
+      "schema": { "$ref": "#/entities/Message" },
+      "description": "Chat messages within a booking"
+    },
+    "users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profiles"
+    },
+    "newsletters/{docId}": {
+      "schema": { "$ref": "#/entities/NewsletterSubscriber" },
+      "description": "Newsletter subscriptions"
+    }
+  }
+}

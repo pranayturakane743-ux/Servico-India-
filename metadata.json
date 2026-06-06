@@ -1,0 +1,6 @@
+{
+  "name": "Servico India",
+  "description": "A 3D interactive Local Service Booking System featuring real-time tracking, OTP confirmation, instant invoicing, and integrated UPI payments.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
