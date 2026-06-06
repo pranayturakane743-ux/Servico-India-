@@ -2,10 +2,14 @@ import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, Send, Loader2, Sparkles, MessageSquare } from 'lucide-react';
 import { useLocale } from '../LocaleContext';
+import { auth, db } from '../lib/firebase';
+import { collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 
 interface Message {
   role: 'user' | 'model';
   text: string;
+  createdAt?: any;
 }
 
 export const FloatingAI = () => {
@@ -14,6 +18,7 @@ export const FloatingAI = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [currentUserId, setCurrentUserId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const initialMessages = {
@@ -23,81 +28,103 @@ export const FloatingAI = () => {
   };
 
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([{ role: 'model', text: initialMessages[locale] || initialMessages.en }]);
-    }
-  }, [locale]);
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setCurrentUserId(user.uid);
+      } else {
+        let sessId = localStorage.getItem('aura_chat_session');
+        if (!sessId) {
+          sessId = 'guest_' + Math.random().toString(36).substring(2, 11);
+          localStorage.setItem('aura_chat_session', sessId);
+        }
+        setCurrentUserId(sessId);
+      }
+    });
+    return () => unsubscribeAuth();
+  }, []);
+
+  useEffect(() => {
+    if (!currentUserId) return;
+
+    const auraCol = collection(db, 'aura_messages');
+    const q = query(
+      auraCol,
+      where('userId', '==', currentUserId)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const msgs: Message[] = [];
+      snapshot.forEach((doc) => {
+        const data = doc.data();
+        if (data.role === 'user' || data.role === 'model') {
+          msgs.push({
+            role: data.role,
+            text: data.text,
+            createdAt: data.createdAt
+          });
+        }
+      });
+
+      // Sort in-memory by createdAt timestamp dynamically
+      msgs.sort((a, b) => {
+        const t1 = a.createdAt?.toMillis?.() || 0;
+        const t2 = b.createdAt?.toMillis?.() || 0;
+        return t1 - t2;
+      });
+
+      if (msgs.length > 0) {
+        setMessages(msgs);
+      } else {
+        setMessages([{ role: 'model', text: initialMessages[locale] || initialMessages.en }]);
+      }
+    }, (error) => {
+      console.error("Error reading aura messages directly from database:", error);
+    });
+
+    return () => unsubscribe();
+  }, [currentUserId, locale]);
   
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isLoading || !currentUserId) return;
     
     const userMsg = input.trim();
     setInput("");
-    
-    const newMessages = [...messages, { role: 'user', text: userMsg }];
-    setMessages(newMessages as Message[]);
     setIsLoading(true);
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ messages: newMessages }),
+      const auraCol = collection(db, 'aura_messages');
+      await addDoc(auraCol, {
+        text: userMsg,
+        role: 'user',
+        userId: currentUserId,
+        createdAt: serverTimestamp(),
+        responded: false
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to start stream');
-      }
-
-      setMessages(prev => [...prev, { role: 'model', text: '' }]);
-
-      const reader = response.body?.getReader();
-      const decoder = new TextDecoder();
-
-      if (reader) {
-        let isDone = false;
-        while (!isDone) {
-          const { value, done } = await reader.read();
-          isDone = done;
-          if (value) {
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split('\n');
-            
-            for (const line of lines) {
-              if (line.startsWith('data: ') && line !== 'data: [DONE]') {
-                try {
-                  const data = JSON.parse(line.slice(6));
-                  if (data.text) {
-                    setMessages(prev => {
-                      const updated = [...prev];
-                      const last = updated[updated.length - 1];
-                      if (last && last.role === 'model') {
-                        last.text += data.text;
-                      }
-                      return updated;
-                    });
-                  }
-                } catch (e) {
-                  console.error("Error parsing stream chunk", e, line);
-                }
-              }
-            }
-          }
-        }
-      }
+      // Trigger server-side response generation securely
+      await fetch('/api/chat-reply', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          userId: currentUserId,
+          text: userMsg
+        })
+      });
     } catch (error) {
-      console.error("Chat Error:", error);
-      setMessages(prev => [...prev, { role: 'model', text: "Sorry, I am having trouble connecting right now." }]);
+      console.error("Direct-to-DB message save error:", error);
+      setMessages(prev => [...prev, { role: 'model', text: "Could not send message. Please review your network or try again." }]);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const isModelTyping = isLoading || (messages.length > 0 && messages[messages.length - 1].role === 'user');
 
   return (
     <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-4 pointer-events-none">
@@ -133,19 +160,19 @@ export const FloatingAI = () => {
             <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3 custom-scrollbar">
               {messages.map((msg, i) => (
                 <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  key={i} 
-                  className={`max-w-[85%] rounded-2xl p-3 text-sm leading-relaxed ${
-                    msg.role === 'user' 
-                      ? 'bg-navy text-white rounded-tr-sm self-end' 
-                      : 'bg-slate-100 text-slate-700 rounded-tl-sm self-start shadow-sm border border-slate-50'
-                  }`}
+                   initial={{ opacity: 0, y: 10 }}
+                   animate={{ opacity: 1, y: 0 }}
+                   key={i} 
+                   className={`max-w-[85%] rounded-2xl p-3 text-sm leading-relaxed ${
+                     msg.role === 'user' 
+                       ? 'bg-navy text-white rounded-tr-sm self-end' 
+                       : 'bg-slate-100 text-slate-700 rounded-tl-sm self-start shadow-sm border border-slate-50'
+                   }`}
                 >
                   {msg.text}
                 </motion.div>
               ))}
-              {isLoading && (
+              {isModelTyping && (
                 <div className="bg-slate-100 text-slate-700 rounded-2xl rounded-tl-sm self-start shadow-sm border border-slate-50 p-3 max-w-[85%] flex items-center gap-2">
                   <div className="flex gap-1">
                     <span className="w-1.5 h-1.5 bg-slate-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
@@ -169,10 +196,10 @@ export const FloatingAI = () => {
               />
               <button 
                 onClick={handleSend}
-                disabled={!input.trim() || isLoading}
+                disabled={!input.trim() || isModelTyping}
                 className="w-12 h-12 flex-shrink-0 bg-saffron hover:bg-saffron-dark text-white rounded-xl flex items-center justify-center transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-md"
               >
-                {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                {isModelTyping ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
               </button>
             </div>
           </motion.div>
