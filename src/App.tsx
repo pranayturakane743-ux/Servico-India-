@@ -226,7 +226,9 @@ export default function App() {
               ref={videoRef}
               src="/hero-video.mp4"
               playsInline
-              className="w-full h-full object-contain md:object-cover bg-black"
+              preload="auto"
+              poster="/poster.png.png"
+              className="w-full h-full object-contain md:object-cover bg-black transition-opacity duration-300"
               onEnded={() => setShowIntro(false)}
             />
             {!introStarted && (
@@ -650,9 +652,20 @@ export default function App() {
                                 referrerPolicy="no-referrer"
                                 className="relative z-0 w-full h-full object-cover object-top group-hover:scale-105 transition-transform duration-700"
                               />
-                              <div className="absolute top-4 right-4 z-20 w-10 h-10 bg-white/10 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.12)] text-white rounded-xl flex items-center justify-center border border-white/20">
+                              <motion.div
+                                initial={{ scale: 0.3, opacity: 0, rotate: -20 }}
+                                whileInView={{ scale: 1, opacity: 1, rotate: 0 }}
+                                viewport={{ once: true }}
+                                transition={{
+                                  type: "spring",
+                                  stiffness: 260,
+                                  damping: 15,
+                                  delay: i * 0.12 + 0.25
+                                }}
+                                className="absolute top-4 right-4 z-20 w-10 h-10 bg-white/10 backdrop-blur-md shadow-[0_8px_32px_rgba(0,0,0,0.12)] text-white rounded-xl flex items-center justify-center border border-white/20 group-hover:scale-110 group-hover:rotate-6 transition-all duration-300"
+                              >
                                 <IconPattern className="w-5 h-5 drop-shadow-md" />
-                              </div>
+                              </motion.div>
                               {service.iconName === "⚡" && (
                                 <div className="absolute bottom-4 left-4 z-20">
                                   <span className="bg-saffron/90 backdrop-blur-md text-navy text-[10px] font-bold px-3 py-1 rounded-full shadow-lg flex items-center gap-1">
@@ -663,9 +676,20 @@ export default function App() {
                               )}
                             </div>
                           ) : (
-                            <div className="w-14 h-14 bg-slate-50 group-hover:bg-saffron/10 text-saffron rounded-2xl flex items-center justify-center mb-6 transition-colors shadow-sm">
+                            <motion.div
+                              initial={{ scale: 0.3, opacity: 0, rotate: -20 }}
+                              whileInView={{ scale: 1, opacity: 1, rotate: 0 }}
+                              viewport={{ once: true }}
+                              transition={{
+                                type: "spring",
+                                stiffness: 260,
+                                damping: 15,
+                                delay: i * 0.12 + 0.25
+                              }}
+                              className="w-14 h-14 bg-slate-50 group-hover:bg-saffron/10 text-saffron rounded-2xl flex items-center justify-center mb-6 transition-all duration-300 shadow-sm group-hover:scale-110 group-hover:rotate-6"
+                            >
                               <IconPattern className="w-7 h-7" />
-                            </div>
+                            </motion.div>
                           )}
 
                           <h3 className="text-xl font-bold text-navy mb-2">

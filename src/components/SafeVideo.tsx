@@ -40,5 +40,14 @@ export const SafeVideo: React.FC<SafeVideoProps> = ({ src, ...props }) => {
   // Strip autoPlay out from native element properties, as we handle it programmatically inside useEffect
   const { autoPlay, ...nativeProps } = props;
 
-  return <video ref={videoRef} src={src} {...nativeProps} />;
+  return (
+    <video
+      ref={videoRef}
+      src={src}
+      playsInline
+      preload="auto"
+      muted
+      {...nativeProps}
+    />
+  );
 };
