@@ -123,9 +123,7 @@ Make sure you have [Node.js](https://nodejs.org/) (version 18+ recommended) inst
 ├── server.ts                      # Express API routes and Vite dev mode middlewares
 ├── vite.config.ts                 # Dev environment setup
 ├── package.json                   # Dependency registries and script configurations
-└── README.md                      # Elegant system documentation
-```
-
+└── README.md                    
 ---
 
 ## 🔒 Security & Performance
