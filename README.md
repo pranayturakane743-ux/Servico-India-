@@ -84,7 +84,6 @@ Make sure you have [Node.js](https://nodejs.org/) (version 18+ recommended) inst
    ```bash
    npm run dev
    ```
-   Open your browser and navigate to `http://localhost:3000`.
 
 5. **Lint and Type Check**
    Verify TypeScript safety parameters across the codebase:
