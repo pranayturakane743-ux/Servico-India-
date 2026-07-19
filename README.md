@@ -124,7 +124,7 @@ Make sure you have [Node.js](https://nodejs.org/) (version 18+ recommended) inst
 ├── vite.config.ts                 # Dev environment setup
 ├── package.json                   # Dependency registries and script configurations
 └── README.md                    
----
+```
 
 ## 🔒 Security & Performance
 * **Lazy SDK Initializations**: All heavy third-party assets and client libraries are initialized dynamically, preventing server startup crashes.
